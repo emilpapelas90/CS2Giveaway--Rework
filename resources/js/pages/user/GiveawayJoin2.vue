@@ -10,7 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
-import { Users, DollarSign, CheckIcon } from 'lucide-vue-next';
+import { Users, DollarSign, CheckIcon, AlarmClock, Mail } from 'lucide-vue-next';
 import { Toaster } from '@/components/ui/sonner';
 import 'vue-sonner/style.css';
 import { toast } from 'vue-sonner';
@@ -44,8 +44,9 @@ const formatTime = (ms: number): string => {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  //if (days > 0) return `${days}d ${hours}h`
-  //if (hours > 0) return `${hours}h ${minutes}m`
+  if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 };
 
@@ -53,9 +54,13 @@ const updateTimer = () => {
   const now = Date.now();
   const startTime = new Date(giveaway.value.created_at).getTime();
   const endTime = new Date(giveaway.value.end_time).getTime();
-  const totalDuration = endTime - startTime || 1;
+  const totalDuration = endTime - startTime;
   const timeLeft = endTime - now;
-  const progress = Math.min(100, Math.max(0, ((now - startTime) / totalDuration) * 100));
+  const progress = Math.min(100, Math.max(0, ((totalDuration - timeLeft) / totalDuration) * 100));
+
+  //console.log('Progress:', giveaway.value.progress);
+ // giveaway.value.progress = progress;
+  //giveaway.value.timeRemaining = timeLeft <= 0 ? 'Ended' : formatTime(timeLeft);
 
   giveaway.value = {
     ...giveaway.value,
@@ -84,54 +89,22 @@ const joinGiveaway = (id: any) => {
   })
 }
 
-const getSkinTitle = (skinName) => {
-  return skinName.split(' (')[0]; // removes everything after ' ('
+const getSkinTitle = (skinName: string) => {
+  return skinName.split(' (')[0];
 }
 
-const getCondition = (skinName) => {
-  const match = skinName.match(/\(([^)]+)\)/); // matches the part inside parentheses
-  return match ? match[1] : ''; // return 'Field-Tested' or ''
+const getCondition = (skinName: string) => {
+  const match = skinName.match(/\(([^)]+)\)/);
+  return match ? match[1] : '';
 }
+
+const hasEnded = computed(() => {
+  return new Date(giveaway.value.end_time).getTime() <= Date.now();
+});
 
 const formatDate = (date: any) => {
-  //return new Date(date).toLocaleString();
-  //return moment(date).format('MMMM D, YYYY h:mm A')
   return moment(date).format('MMM D, YYYY')
 };
- 
-// watchEffect(() => {
-//   if (page.props.flash.success) {
-//     toast('Success', {
-//       description: page.props.flash.success,
-//     });
-//   }
-
-//   if (page.props.flash.error) {
-//     toast('Error', {
-//       description: page.props.flash.error,
-//     });
-//   }
-// });
-
-//   if (hasJoined.value || giveaway.timeRemaining === 'Ended') return;
-
-//   try {
-//     await axios.post(`/giveaways/${giveaway.id}/join`);
-//     hasJoined.value = true;
-//     toast.success('Successfully joined the giveaway!');
-//     // optionally update entries count
-//     giveaway.total_entries += 1;
-//   } catch (e) {
-//     toast.error('Something went wrong.');
-//   }
-// };
-
-// const shareReferral = () => {
-//   const url = `${window.location.origin}/giveaways/${giveaway.id}?ref=${user.id}`;
-//   navigator.clipboard.writeText(url).then(() => {
-//     toast.success('Referral link copied!');
-//   });
-// };
 
 onMounted(() => {
   updateTimer();
@@ -141,58 +114,21 @@ onMounted(() => {
 onUnmounted(() => {
   if (interval.value) clearInterval(interval.value);
 });
-
-
-const participants = [
-  {
-    id: 1,
-    name: 'Alice Johnson',
-    avatar: 'https://i.pravatar.cc/100?img=1'
-  },
-  {
-    id: 2,
-    name: 'Bob Smith',
-    avatar: 'https://i.pravatar.cc/100?img=2'
-  },
-  {
-    id: 3,
-    name: 'Charlie Kim',
-    avatar: 'https://i.pravatar.cc/100?img=3'
-  },
-  {
-    id: 4,
-    name: 'Dana Lee',
-    avatar: 'https://i.pravatar.cc/100?img=4'
-  },
-  {
-    id: 5,
-    name: 'Evan White',
-    avatar: 'https://i.pravatar.cc/100?img=5'
-  },
-  {
-    id: 6,
-    name: 'Fiona Grey',
-    avatar: 'https://i.pravatar.cc/100?img=6'
-  },
-  {
-    id: 7,
-    name: 'George Stone',
-    avatar: 'https://i.pravatar.cc/100?img=7'
-  },
-  {
-    id: 8,
-    name: 'Hannah Gold',
-    avatar: 'https://i.pravatar.cc/100?img=8'
-  },
-]
-
 </script>
 
 <template>
  <NewAppLayout>
 
+
+      <div v-if="hasEnded" class="w-7xl bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-4 text-red-400 hover:border-orange-500/40 transition-all duration-300 mb-4">
+        <div class="flex items-center gap-3">
+          
+          <p class="text-sm font-medium">This giveaway has ended. You can no longer join.</p>
+        </div>
+      </div>
+
       <!-- Giveaways Grid -->
-        <div class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-6 hover:border-orange-500/40 transition-all duration-300">
+        <div class="w-7xl bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-4 hover:border-orange-500/40 transition-all duration-300">
           
           <!-- Skin Image -->
 
@@ -200,7 +136,6 @@ const participants = [
             <!-- <div class="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-2 rounded">
               Daily
             </div> -->
-
             <img :src="giveaway.image" 
                 :alt="giveaway.skin_name"
                 class="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-300">
@@ -218,44 +153,87 @@ const participants = [
             </div>
             <div class="w-full bg-gray-700 rounded-full h-2">
               <div class="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-300"
-                   :style="{ width: giveaway.progress + '%' }"></div>
-            </div>
+                :style="{ width: giveaway.progress + '%' }"></div>
+              </div>
           </div>
 
           <!-- Time Left -->
           <div class="flex justify-between items-center">
-            <span class="text-orange-400 font-semibold">⏰ {{ giveaway.timeRemaining }}</span>
+            <span class="flex text-orange-400 font-semibold"><AlarmClock class="w-5 h-5 mr-1"/> {{ giveaway.timeRemaining }}</span>
             <span class="text-gray-400 text-sm">Ends: {{ formatDate(giveaway.end_time) }}</span>
           </div>
 
           <!-- Requirements -->
 
 
-          <div v-for="(req, ind) in giveaway.requirements" :key="ind" class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-4 my-4 hover:border-orange-500/40 transition-all duration-300">
-            <div class="flex items-center justify-between gap-4">
+          <ul class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-4 mt-4 space-y-3">
+            <li
+              v-for="(req, ind) in giveaway.requirements"
+              :key="ind"
+              class="flex items-center justify-between border-b border-orange-500/20 last:border-b-0 pb-3">
               <div class="flex items-center gap-3">
-                <div class="bg-[#5865F2] text-white rounded-full w-10 h-10 flex items-center justify-center">
-                  <i class="fab fa-discord text-lg"></i>
-                </div>
-                <div>
-                  <p class="text-sm text-muted-foreground">Join Discord Server</p>
-                  <p class="text-base font-medium">{{ req.server_name || 'Unknown Server' }}</p>
-                </div>
+                <!-- Icon & Info -->
+                <template v-if="req.type === 'discord'">
+                  <div class="bg-[#5865F2] text-white rounded-full w-10 h-10 flex items-center justify-center">
+                    <!-- Discord SVG icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" class="bi bi-discord" viewBox="0 0 16 16">
+                      <path d="M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm text-muted-foreground">{{ req.label }}</p>
+                    <p class="text-base font-medium">{{ req.server_name || 'Unknown Server' }}</p>
+                  </div>
+                </template>
+
+                <template v-else-if="req.type === 'email'">
+                  <div class="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center">
+                    <!-- Email icon -->
+                    <Mail class="w-5 h-5"/>
+                  </div>
+                  <div>
+                    <p class="text-sm text-muted-foreground">{{ req.label }}</p>
+                  </div>
+                </template>
               </div>
 
-              <a v-if="!req.in_server" :href="req.invite" target="_blank" rel="noopener" class="bg-[#5865F2] text-white px-4 py-1.5 text-sm font-medium rounded-md hover:bg-[#4752c4] transition">
-                Join
-              </a>
+              <div>
+                <template v-if="req.type === 'discord'">
+                  <a
+                    v-if="!req.in_server"
+                    :href="req.invite"
+                    target="_blank"
+                    rel="noopener"
+                    class="bg-[#5865F2] text-white px-4 py-1.5 text-sm font-medium rounded-md hover:bg-[#4752c4] transition"
+                  >
+                    Join
+                  </a>
+                  <span v-else class="text-green-500 ml-2 flex items-center gap-1">
+                    <CheckIcon class="w-4 h-4 inline" /> Joined
+                  </span>
+                </template>
 
-              <span v-if="req.in_server" class="text-green-500 ml-2">
-                <CheckIcon class="w-4 h-4 inline" /> Joined
-              </span>
-            </div>
-          </div>
+                <template v-else-if="req.type === 'email'">
+                  <a
+                    v-if="!req.confirmed"
+                    href="/settings"
+                    class="bg-blue-600 text-white px-4 py-1.5 text-sm font-medium rounded-md hover:bg-blue-700 transition"
+                  >
+                    Confirm Email
+                  </a>
+                  <span v-else class="text-green-500 ml-2 flex items-center gap-1">
+                    <CheckIcon class="w-4 h-4 inline" /> Confirmed
+                  </span>
+                </template>
+              </div>
+            </li>
+          </ul>
 
           <!-- Join Button -->
 
-          <Button v-if="requirements.every(req => req.in_server)" @click="joinGiveaway(giveaway.id)" :disabled="giveaway.entered" class="flex justify-center w-full text-white py-3 rounded-lg font-semibold transition-all duration-200" :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'">
+          <Button v-if="requirements.every((req: any) => {
+            if (req.type === 'discord') return req.in_server; if (req.type === 'email') return req.confirmed; return false; })" 
+            @click="joinGiveaway(giveaway.id)" :disabled="giveaway.entered" class="flex justify-center w-full text-white py-3 mt-4 rounded-lg font-semibold transition-all duration-200" :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'">
              <!-- <template v-if="giveaway.entered">
               <CheckIcon class="w-4 h-4" /> Joined
              </template>
@@ -269,6 +247,27 @@ const participants = [
                   class="flex justify-center w-full text-white py-3 rounded-lg font-semibold transition-all duration-200">
             {{ giveaway.joined ? '✅ Joined' : '🎯 Join Giveaway' }}
           </Link> -->
+        </div>
+
+
+        <div class="w-7xl bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-4 mt-6 hover:border-orange-500/40 transition-all duration-300">
+          <h2 class="text-xl text-center">Total Participants {{ giveaway.participants.length }}</h2>
+          <div class="pt-6">
+            <TooltipProvider>
+              <div class="flex flex-wrap gap-3">
+                <Tooltip v-for="user in giveaway.participants" :key="user.id">
+                  <TooltipTrigger as-child>
+                    <Avatar class="h-16 w-16 overflow-hidden rounded-full">
+                      <AvatarFallback class="rounded-lg text-black dark:text-white">{{ getInitials(user.name) }}</AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{{ user.name }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          </div>
         </div>
       
 

@@ -27,7 +27,7 @@ class AdminController extends Controller
 
     public function store(Request $request) {
 
-      //dd($request->all());
+      //dd($request->requirements);
 
       $validateData = $request->validate([
         'skin_name' => ['required', 'string', 'max:255'],
@@ -37,7 +37,7 @@ class AdminController extends Controller
         'entries' => ['nullable', 'integer', 'min:0'],
         'max_entries' => ['required', 'integer', 'min:1'],
         'requirements' => ['nullable', 'array'],
-        'end_time' => ['required', 'date'],
+        'end_time' => ['required', 'date', 'after:now'],
         'is_active' => ['required', 'boolean'],
       ]);
 

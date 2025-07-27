@@ -45,12 +45,12 @@ const handleClickOutside = (event) => {
         <div class="flex justify-between items-center h-16">
 
           <!-- Logo/Brand -->
-          <div class="flex items-center space-x-2">
+          <Link :href="route('welcome')" class="flex items-center space-x-2">
             <div class="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
               <span class="text-white font-bold text-sm">CS</span>
             </div>
             <h1 class="text-xl font-bold text-white">SkinDrop</h1>
-          </div>
+          </Link>
 
           <!-- Desktop Navigation -->
          
@@ -60,15 +60,15 @@ const handleClickOutside = (event) => {
             <Link :href="route('welcome')" class="text-gray-300 hover:text-orange-400 transition-colors duration-200 font-medium">
               Home
             </Link>
-            <Link :href="route('giveaways2')" :class="route().current('giveaways2') ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'" class="transition-colors duration-200 font-medium">
-              Active Giveaways
+            <Link :href="route('giveaways')" :class="route().current('giveaways') ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'" class="transition-colors duration-200 font-medium">
+              Giveaways
             </Link>
             <!-- <Link :href="route('winners')" class="text-gray-300 hover:text-orange-400 transition-colors duration-200 font-medium">
               Winners
             </Link> -->
-            <a href="#" class="text-gray-300 hover:text-orange-400 transition-colors duration-200 font-medium">
+            <!-- <a href="#" class="text-gray-300 hover:text-orange-400 transition-colors duration-200 font-medium">
               How it Works
-            </a>
+            </a> -->
             <!-- <button class="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105">
               Join Giveaway
             </button> -->
@@ -193,10 +193,8 @@ const handleClickOutside = (event) => {
           </div>
 
           <!-- Mobile menu button -->
-            <button 
-              @click="toggleMobileMenu"
-              class="md:hidden text-gray-300 hover:text-white focus:outline-none focus:text-white transition-colors duration-200"
-            >
+            <button @click="toggleMobileMenu"
+              class="md:hidden text-gray-300 hover:text-white focus:outline-none focus:text-white transition-colors duration-200">
               <svg v-if="!isMobileMenuOpen" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -205,21 +203,7 @@ const handleClickOutside = (event) => {
               </svg>
             </button>
            
-
         </div>
-
-          <!-- <button 
-            @click="toggleMobileMenu"
-            class="md:hidden text-gray-300 hover:text-white focus:outline-none focus:text-white transition-colors duration-200"
-          >
-            <svg v-if="!isMobileMenuOpen" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <svg v-else class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button> -->
-         
 
         <!-- Mobile Navigation -->
         <transition
@@ -231,22 +215,24 @@ const handleClickOutside = (event) => {
           leave-to-class="opacity-0 scale-95"
         >
           <div v-if="isMobileMenuOpen" class="md:hidden">
-            <div class="px-2 pt-2 pb-3 space-y-1 bg-black/90 backdrop-blur-md rounded-lg mt-2 border border-orange-500/20">
-              <a href="#" class="block px-3 py-2 text-gray-300 hover:text-orange-400 hover:bg-gray-800/50 rounded-md transition-all duration-200 font-medium">
+            <div class="px-2 pt-2 pb-3 mb-4 space-y-1 bg-black/90 backdrop-blur-md rounded-lg mt-2 border border-orange-500/20">
+             <template v-if="user">
+              <Link :href="route('welcome')" class="block text-gray-300 hover:text-orange-400 transition-colors duration-200 font-medium">
                 Home
-              </a>
-              <a href="#" class="block px-3 py-2 text-gray-300 hover:text-orange-400 hover:bg-gray-800/50 rounded-md transition-all duration-200 font-medium">
+              </Link>
+              <Link :href="route('giveaways2')" :class="route().current('giveaways2') ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'" class="block transition-colors duration-200 font-medium">
                 Active Giveaways
-              </a>
-              <a href="#" class="block px-3 py-2 text-gray-300 hover:text-orange-400 hover:bg-gray-800/50 rounded-md transition-all duration-200 font-medium">
-                Winners
-              </a>
-              <a href="#" class="block px-3 py-2 text-gray-300 hover:text-orange-400 hover:bg-gray-800/50 rounded-md transition-all duration-200 font-medium">
-                How it Works
-              </a>
-              <button class="w-full mt-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-2 rounded-full font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200">
-                Join Giveaway
-              </button>
+              </Link>
+             </template>
+             <template v-else>
+              <Link :href="route('login')" :class="route().current('login') ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'" class="block transition-colors duration-200 font-medium">
+                Login
+              </Link>
+              <Link :href="route('register')" :class="route().current('register') ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'" class="block transition-colors duration-200 font-medium">
+                Register
+              </Link>
+             </template>
+            
             </div>
           </div>
         </transition>

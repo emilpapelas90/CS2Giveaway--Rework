@@ -18,11 +18,11 @@ use Illuminate\Http\Request;
 class GiveawayController extends Controller
 {
 
-    public function giveaways2() {
+    public function giveaways() {
       $giveaways = Giveaway::where('is_active', 1)->get()->filter(function ($giveaway) {
         return Carbon::parse($giveaway->end_time)->isFuture();
       });
-      return Inertia::render('user/Giveaways2', ['giveaways' => $giveaways]);
+      return Inertia::render('user/Giveaways', ['giveaways' => $giveaways]);
     }
     // public function giveaways() {
     //   $giveaways = Giveaway::where('is_active', 1)->get()->filter(function ($giveaway) {
@@ -57,6 +57,12 @@ class GiveawayController extends Controller
         }
       }
 
+      $requirements[] = [
+        'type' => 'email',
+        'label' => 'Confirm your email address',
+        'confirmed' => !is_null($user->email_verified_at),
+      ];
+
       
       $entered = $giveaway->users()->where('user_id', $user->id)->exists();;
 
@@ -89,6 +95,18 @@ class GiveawayController extends Controller
 
     public function enter(Giveaway $giveaway) {
       $user = auth()->user();
+
+
+      if (now()->greaterThan($giveaway->end_time)) {
+        return back()->withErrors(['giveaway' => 'This giveaway has already ended.']);
+      }
+
+      if (is_null($user->email_verified_at)) {
+        throw ValidationException::withMessages([
+            'email' => 'Please verify your email before entering the giveaway.',
+        ]);
+      }
+
       $requirements = $giveaway->requirements;
 
 

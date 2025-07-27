@@ -16,7 +16,7 @@ use Inertia\Inertia;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
- Route::get('giveaways2', [GiveawayController::class, 'giveaways2'])->name('giveaways2');
+ Route::get('giveaways', [GiveawayController::class, 'giveaways'])->name('giveaways');
  Route::get('giveaway/{id}', [GiveawayController::class, 'join'])->name('giveaway.join');
 
  Route::get('dashboard', [UserController::class, 'dashboard'])->name('dashboard');
@@ -24,6 +24,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
  Route::get('giveaways', [GiveawayController::class, 'giveaways'])->name('giveaways');
  //Route::get('giveaways/{id}', [GiveawayController::class, 'join'])->name('giveaway.join');
  Route::post('giveaways/{giveaway}', [GiveawayController::class, 'enter'])->name('giveaway.enter');
+
+ Route::get('settings', [GiveawayController::class, 'settings'])->name('settings');
 
 
  Route::get('/user/discord/connect', [DiscordController::class, 'redirect'])->name('discord.connect');

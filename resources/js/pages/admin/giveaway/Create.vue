@@ -13,7 +13,7 @@
 
            <div class="grid gap-2 col-span-1 md:col-span-2 lg:col-span-2">
              <Label for="title">End Time</Label>
-             <Datepicker v-model="form.end_time" />
+             <Datepicker v-model="form.end_time" :min-date="new Date()"/>
              <span v-if="form.errors.end_time" class="text-red-600 text-xs">{{ form.errors.end_time }}</span>
            </div>
   
@@ -53,7 +53,29 @@
 
            <div class="grid gap-2 col-span-1 md:col-span-1 lg:col-span-6">
             <Label class="mb-1 block">Requirements</Label>
-            <div v-for="(req, index) in form.requirements" :key="index" class="flex items-center gap-2 mb-2">
+            <div v-for="(req, index) in form.requirements" :key="index" class="flex flex-col md:flex-row items-start md:items-center gap-2 mb-2">
+
+              <!-- <template v-if="req.type === 'email'">
+                <div class="flex items-center gap-2 text-sm text-green-600 font-semibold">
+                  ✅ Email confirmation required
+                </div>
+              </template> -->
+
+              <!-- <template v-else-if="req.type === 'discord'">
+                <Select v-model="req.type" class="w-full md:w-1/3" disabled>
+                  <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="'discord'">Join Discord Server</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Input v-model="req.server_name" type="text" placeholder="Discord Server Name" class="flex-1 w-full" />
+                <Input v-model="req.guild_id" type="text" placeholder="Guild ID" class="flex-1 w-full" />
+                <Input v-model="req.invite" type="text" placeholder="Invite Link" class="flex-1 w-full" />
+
+                <Button type="button" variant="destructive" @click="removeRequirement(index)">X</Button>
+              </template> -->
+
               <Select v-model="req.type" class="w-1/3">
                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
@@ -67,6 +89,10 @@
 
               <Button type="button" variant="destructive" @click="removeRequirement(index)">X</Button>
             </div>
+
+            <!-- <Button type="button" @click="() => addRequirement('discord')" size="sm" variant="secondary">
+              + Add Discord Requirement
+            </Button> -->
 
             <Button type="button" @click="addRequirement" size="sm" variant="secondary">+ Add Requirement</Button>
            </div>
@@ -161,9 +187,8 @@ const requirementOptions = ref([
   { label: 'Join Discord Server', type: 'discord', guild_id: '', invite: '' },
 ]);
 
-
 const addRequirement = () => {
-  form.requirements.push({ type: '', server_name: '', invite: '', guild_id: '' });
+  form.requirements.push({ label: 'Join Discord Server', type: '', server_name: '', invite: '', guild_id: '' });
 };
 
 const removeRequirement = (index) => {
