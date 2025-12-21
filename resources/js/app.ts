@@ -6,6 +6,18 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
+import Echo from "laravel-echo";
+import Pusher from "pusher-js";
+
+import { configureEcho } from '@laravel/echo-vue';
+import { useEcho } from './composables/useEcho';
+
+const { initializeEcho, disconnect } = useEcho();
+
+
+configureEcho({
+    broadcaster: 'pusher',
+});
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -13,10 +25,15 @@ createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
+        const vueApp = createApp({ render: () => h(App, props) })
             .use(plugin)
-            .use(ZiggyVue)
-            .mount(el);
+            .use(ZiggyVue);
+
+             if (props.initialPage.props.auth.user) {
+                initializeEcho();
+            }
+            
+            vueApp.mount(el);
     },
     progress: {
         color: '#4B5563',

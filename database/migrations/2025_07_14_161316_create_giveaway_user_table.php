@@ -15,9 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('giveaway_id')->constrained('giveaways')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedInteger('nonce')->default(0);
             $table->timestamp('entered_at')->nullable();
-            $table->timestamps();
             $table->unique(['giveaway_id', 'user_id']);
+            $table->timestamps();
         });
     }
 

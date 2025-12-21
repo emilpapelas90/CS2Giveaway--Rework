@@ -29,6 +29,8 @@ class AdminController extends Controller
 
       //dd($request->requirements);
 
+      $serverSeed = Str::random(64);
+
       $validateData = $request->validate([
         'skin_name' => ['required', 'string', 'max:255'],
         'image' => ['required', 'string', 'max:2048'],
@@ -36,10 +38,15 @@ class AdminController extends Controller
         'rarity' => ['required', 'string', 'max:255'],
         'entries' => ['nullable', 'integer', 'min:0'],
         'max_entries' => ['required', 'integer', 'min:1'],
-        'requirements' => ['nullable', 'array'],
-        'end_time' => ['required', 'date', 'after:now'],
+        'end_time' => ['required', 'date'],
         'is_active' => ['required', 'boolean'],
       ]);
+
+      $validateData['end_time'] = Carbon::parse($request->end_time)->format('Y-m-d H:i:s');
+
+      $validateData['server_seed'] = $serverSeed;
+      $validateData['server_seed_hashed'] = hash('sha256', $serverSeed);
+      $validateData['nonce'] = 0;
 
       Giveaway::create($validateData);
       return redirect()->route('admin.giveaways')->with('success', 'Giveaway added successfully!');

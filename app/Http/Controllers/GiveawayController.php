@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Giveaway;
+use App\Models\GiveawayWinners;
 use App\Models\GiveawayUser;
+use App\Events\GiveawayUpdated;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
@@ -15,132 +17,141 @@ use Illuminate\Validation\ValidationException;
 use App\Services\DiscordService;
 use Illuminate\Http\Request;
 
+use App\Jobs\ProcessGiveawaysJob;
+
 class GiveawayController extends Controller
 {
 
+
+    public function test() {
+        return Inertia::render('user/test');
+    }
+
     public function giveaways() {
-      $giveaways = Giveaway::where('is_active', 1)->get()->filter(function ($giveaway) {
-        return Carbon::parse($giveaway->end_time)->isFuture();
-      });
+      $giveaways = Giveaway::where('is_active', 1)->where(function ($q) { $q->whereNull('start_time'); })->get();
+
       return Inertia::render('user/Giveaways', ['giveaways' => $giveaways]);
     }
-    // public function giveaways() {
-    //   $giveaways = Giveaway::where('is_active', 1)->get()->filter(function ($giveaway) {
-    //     return Carbon::parse($giveaway->end_time)->isFuture();
-    //   });
-    //   return Inertia::render('user/Giveaways', ['giveaways' => $giveaways]);
-    // }
 
-    public function join($id, DiscordService $discordService) {
-      
-      $giveaway = Giveaway::with('users:id,name')->findOrFail($id);
-      $requirements = $giveaway->requirements;
+    public function simulate($giveaway) {
+     abort_unless(app()->environment(['local', 'staging']), 403);
+     dispatch_sync(new ProcessGiveawaysJob($giveaway));
+
+    }
+
+    public function join($id) {
+
+      $giveaway = Giveaway::with(['winner.user', 'participants'])->findOrFail($id);
       $user = auth()->user();
 
-      $discordAccount = $user->socialAccounts()->where('provider', 'discord')->first();
+      // Check if user already joined
+      $entered = $giveaway->participants->pluck('id')->contains($user->id);
 
-      //dd($discordAccount);
-
-
-      foreach ($requirements as &$req) {
-        if ($req['type'] === 'discord') {
-            $req['in_server'] = false;
-
-            if ($discordAccount) {
-                $inServer = $discordService->isUserInGuild($discordAccount, $req['guild_id']);
-
-                // Optionally update the DB field
-                $discordAccount->update(['in_server' => $inServer]);
-
-                $req['in_server'] = $inServer;
-            }
-        }
-      }
-
-      $requirements[] = [
-        'type' => 'email',
-        'label' => 'Confirm your email address',
-        'confirmed' => !is_null($user->email_verified_at),
-      ];
-
-      
-      $entered = $giveaway->users()->where('user_id', $user->id)->exists();;
+      $requirements = $giveaway->requirements;
 
       return Inertia::render('user/GiveawayJoin2', [
-        'giveaway' => [
-          'id' => $giveaway->id,
-          'skin_name' => $giveaway->skin_name,
-          'image' => $giveaway->image,
-          'value' => $giveaway->value,
-          'rarity' => $giveaway->rarity,
-          'entries' => $giveaway->entries,
-          'max_entries' => $giveaway->max_entries,
+          'giveaway' => [
+              'id' => $giveaway->id,
+              'skin_name' => $giveaway->skin_name,
+              'image' => $giveaway->image,
+              'value' => $giveaway->value,
+              'rarity' => $giveaway->rarity,
+              'entries' => $giveaway->entries,
+              'max_entries' => $giveaway->max_entries,
+              'start_time' => $giveaway->start_time,
+              'duration_minutes' => $giveaway->duration_minutes,
+              'min_entries' => $giveaway->min_entries,
+              'created_at' => $giveaway->created_at,
+              'entered' => $entered,
+              'type' => $giveaway->type,
+              'is_active' => $giveaway->is_active,
+              'winner' => $giveaway->winner ? [
+                  'id' => $giveaway->winner->id,
+                  'user' => [
+                      'id' => $giveaway->winner->user->id,
+                      'name' => $giveaway->winner->user->name,
+                  ],
+              ] : null,
+              'participants' => $giveaway->participants->map(fn($user) => [
+                  'id' => $user->id,
+                  'name' => $user->name,
+              ]),
+          ],
           'requirements' => $requirements,
-          'created_at' => $giveaway->created_at,
-          'end_time' => $giveaway->end_time,
-          'entered' => $entered, 
-          'type' => $giveaway->type,
-          'is_active' => $giveaway->is_active,
-          'participants' => $giveaway->users->map(function ($user) {
-            return [
-              'id' => $user->id,
-              'name' => $user->name,
-            ];
-          }),
-        ],
-
-        'requirements' => $requirements,
       ]);
+
     }
 
     public function enter(Giveaway $giveaway) {
+
       $user = auth()->user();
 
-
-      if (now()->greaterThan($giveaway->end_time)) {
-        return back()->withErrors(['giveaway' => 'This giveaway has already ended.']);
+      // Check if user already joined
+      if ($giveaway->participants()->where('user_id', $user->id)->exists()) {
+          return back()->with('error', 'You have already joined this giveaway.');
       }
 
-      if (is_null($user->email_verified_at)) {
-        throw ValidationException::withMessages([
-            'email' => 'Please verify your email before entering the giveaway.',
-        ]);
-      }
-
-      $requirements = $giveaway->requirements;
-
-
-      foreach ($requirements as $requirement) {
-        if ($requirement['type'] === 'discord') {
-            // Extract the server (guild) ID from the invite link
-            $inviteCode = str_replace('https://discord.gg/', '', $requirement['invite']);
-
-            $inviteResponse = Http::get("https://discord.com/api/v10/invites/{$inviteCode}?with_counts=true");
-
-            if (!$inviteResponse->ok()) {
-                throw ValidationException::withMessages([
-                    'requirement' => 'Failed to verify Discord server requirement.',
-                ]);
-            }
-
-            $guildId = $inviteResponse->json('guild.id');
-
-        }
-      }
-
-      // Prevent multiple entries
-      if ($giveaway->hasUserEntered($user->id)) {
-        throw ValidationException::withMessages([
-            'giveaway' => 'You have already entered this giveaway.',
-        ]);
-      }
-
+      // Attach user
       $giveaway->users()->attach($user->id, [
         'entered_at' => now(),
       ]);
 
-      $giveaway->increment('entries');
+      // Update entries count
+      $giveaway->entries = $giveaway->participants()->count();
 
+      // Auto-start if min entries reached
+      if (!$giveaway->start_time && $giveaway->entries >= $giveaway->min_entries) {
+          $giveaway->start_time = now();
+          //$giveaway->is_active = 1;
+      }
+
+
+      $giveaway->save();
+      
+      //dd(new GiveawayUpdated($giveaway));
+      event(new GiveawayUpdated($giveaway));
      return back()->with('success', 'You have successfully entered the giveaway!');
     }
+
+
+    // public function selectWinner($id) {
+    //   $giveaway = Giveaway::with('participants')->findOrFail($id);
+
+    //   // Make sure giveaway is ended
+    //   if (now()->lessThan($giveaway->end_time)) {
+    //       return back()->with('error', 'Giveaway has not ended yet.');
+    //   }
+
+    //   // Check if winner already selected
+    //   if ($giveaway->winner) {
+    //       return back()->with('error', 'Winner already selected.');
+    //   }
+      
+    //   $participants = $giveaway->participants;
+
+    //   if ($participants->isEmpty()) {
+    //       return back()->with('error', 'No participants to select a winner.');
+    //   }
+
+    //   $winner = $participants->random();
+
+    //   $prizeInfo = [
+    //     'skin_name' => $giveaway->skin_name,
+    //     'image' => $giveaway->image, // assuming you have this
+    //     'value' => $giveaway->value ?? null,
+    //     'rarity' => $giveaway->rarity ?? null,
+    //   ];
+      
+    //   GiveawayWinners::create([
+    //     'giveaway_id' => $giveaway->id,
+    //     'user_id' => $winner->id,
+    //     'prize' => $prizeInfo,
+    //   ]);
+
+    //   // Optionally increment giveaways_won
+    //   $winner->increment('giveaways_won');
+    //   $giveaway->delete();
+
+    //   return back()->with('success', "🎉 Winner selected: {$winner->name}");
+    // }
 }

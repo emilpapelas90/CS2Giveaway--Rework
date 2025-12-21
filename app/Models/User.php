@@ -4,9 +4,11 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Giveaway;
+use App\Models\GiveawayWinners;
 use App\Models\SocialAccounts;
 
 class User extends Authenticatable
@@ -23,6 +25,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'client_seed',
         'giveaways_won',
         'is_admin',
         'is_blocked',
@@ -48,6 +51,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function wins() {
+      return $this->hasMany(GiveawayWinner::class);
     }
 
     public function giveaways() {

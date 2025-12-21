@@ -1,52 +1,18 @@
 <template>
  <NewAppLayout>
-
-  <div>
-
-      <!-- <div class="w-full max-w-7xl mx-auto mb-8 text-left">
-        <h1 class="text-4xl font-bold text-white mb-4">Active Raffles</h1>
-        <p class="text-gray-300 text-lg">{{ giveaways.length }} active raffles worth of: ${{ totalValue.toFixed(2) }}</p>
-      </div>
-
-      <div class="mb-8 flex flex-wrap gap-4">
-        <select v-model="selectedFilter" class="bg-black/40 border border-orange-500/20 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-orange-500">
-          <option value="all">All Giveaways</option>
-          <option value="high-value">High Value</option>
-          <option value="ending-soon">Ending Soon</option>
-          <option value="new">New</option>
-        </select>
-        <select v-model="sortBy" class="bg-black/40 border border-orange-500/20 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-orange-500">
-          <option value="newest">Newest First</option>
-          <option value="value-high">Highest Value</option>
-          <option value="value-low">Lowest Value</option>
-          <option value="ending-soon">Ending Soon</option>
-        </select>
-      </div> -->
-
-    </div>
-
+  <div class="flex flex-1 items-center justify-center min-h-svh">
       <!-- Giveaways Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="(giveaway, i) in filteredGiveaways" :key="i"
-             class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-6 hover:border-orange-500/40 transition-all duration-300">
+             class="w-full min-w-lg bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-6 hover:border-orange-500/40 transition-all duration-300">
           
           <!-- Skin Image -->
-
           <div class="relative w-full h-52 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg mb-4 flex items-center justify-center border border-blue-500/30 overflow-hidden">
             <div class="absolute text-sm top-0 left-0 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-2 rounded-br">
               {{ giveaway.type == '0' ? 'Daily' : (giveaway.type == '1' ? 'Weekly' : 'Monthly') }}
             </div>
 
-            <!-- <div v-else-if="giveaway.type == 1" class="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-2 rounded">
-              Weekly
-            </div>
-
-            <div v-else class="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-2 rounded">
-              Monthly
-            </div> -->
-
-            <img :src="giveaway.image" :alt="giveaway.skin_name"
-                class="w-full h-full object-contain p-4 hover:scale-110 transition-transform duration-300">
+            <img :src="giveaway.image" :alt="giveaway.skin_name" class="w-full h-full object-contain p-4 hover:scale-110 transition-transform duration-300">
           </div>
 
           <!-- Skin Info -->
@@ -61,7 +27,7 @@
             </div>
             <div class="w-full bg-gray-700 rounded-full h-2">
               <div class="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-300"
-                   :style="{ width: giveaway.progress + '%' }"></div>
+                :style="{ width: giveaway.progress + '%' }"></div>
             </div>
           </div>
 
@@ -71,21 +37,15 @@
             <span class="text-gray-400 text-sm">Ends: {{ formatDate(giveaway.end_time) }}</span>
           </div>
 
-          <!-- Join Button -->
-          
-          <Link :href="route('giveaway.join', giveaway.id)" :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'"
+          <!-- Join Button -->          
+          <Link :href="route('giveaway.join', giveaway.id)" :class="giveaway.entered ? 'bg-green-600 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'"
                   class="flex justify-center w-full text-white py-3 rounded-lg font-semibold transition-all duration-200">
-            {{ giveaway.joined ? '✅ Joined' : '🎯 Join Giveaway' }}
+            {{ giveaway.entered ? '✅ Joined' : '🎯 Join Giveaway' }}
           </Link>
         </div>
       </div>
 
-      <!-- <div class="text-center mt-12">
-        <button class="bg-black/40 border border-orange-500/20 text-white px-8 py-3 rounded-lg hover:border-orange-500 transition-all duration-200">
-          Load More Giveaways
-        </button>
-      </div> -->
-
+    </div>
   </NewAppLayout>
 </template>
 
@@ -191,13 +151,4 @@ onUnmounted(() => {
     clearInterval(interval.value);
   }
 });
-
-const winners = [
-  { winner: "Emil90 Skinrave.gg", prize: "$3.84" },
-  { winner: "Unknown", prize: "$5.08" },
-  { winner: "Unknown", prize: "$3.74" },
-  { winner: "Unknown", prize: "$0.38" },
-  { winner: "Unknown", prize: "$2.50" },
-]
-
 </script>

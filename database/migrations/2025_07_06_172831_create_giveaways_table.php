@@ -19,10 +19,14 @@ return new class extends Migration
             $table->string('rarity');
             $table->unsignedInteger('entries')->default(0);
             $table->unsignedInteger('max_entries')->default(1);
-            $table->json('requirements')->nullable();
-            $table->string('end_time');
+            $table->dateTime('start_time')->nullable();
+            $table->integer('duration_minutes')->default(60);             
+            $table->integer('min_entries')->default(10);
             $table->boolean('type')->default(0);
-            $table->boolean('is_active')->default(true);
+            $table->string('server_seed');        
+            $table->string('server_seed_hashed'); 
+            $table->string('revealed_server_seed')->nullable();
+            $table->boolean('is_active')->default(false);
             $table->timestamps();
         });
     }

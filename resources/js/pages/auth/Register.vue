@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import NewAppLayout from '@/layouts/NewAppLayout.vue';
 import InputError from '@/components/InputError.vue';
-import TextLink from '@/components/TextLink.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthBase from '@/layouts/AuthLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue'
 
 
@@ -39,9 +33,9 @@ const submit = () => {
 
 <template>
   <NewAppLayout>
-    <div class="max-w-md w-full">
+    <div class="flex flex-1 items-center justify-center min-h-svh">
         <!-- Login Card -->
-        <div class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-8">
+        <div class="w-full max-w-lg bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-8">
           <div class="text-center mb-8">
             <h2 class="text-3xl font-bold text-white">Welcome Back</h2>
             <p class="text-gray-400 mt-2">Sign up to continue to SkinDrop</p>
@@ -52,7 +46,7 @@ const submit = () => {
             <!-- Email/Username Input -->
 
             <div>
-              <label for="name" class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+              <label for="name" class="block text-white font-medium mb-1">Name</label>
               <input 
                 type="text" 
                 id="name" 
@@ -65,7 +59,7 @@ const submit = () => {
             </div>
 
             <div>
-              <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+              <label for="email" class="block text-white font-medium mb-1">Email</label>
               <input 
                 type="text" 
                 id="email" 
@@ -80,7 +74,7 @@ const submit = () => {
             <!-- Password Input -->
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label for="password" class="block text-sm font-medium text-gray-300">Password</label>
+                <label for="password" class="block text-white font-medium mb-1">Password</label>
               </div>
               <div class="relative">
                 <input 
@@ -111,7 +105,7 @@ const submit = () => {
             <!-- Password Input -->
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label for="confirm_password" class="block text-sm font-medium text-gray-300">Confirm Password</label>
+                <label for="confirm_password" class="block text-white font-medium mb-1">Confirm Password</label>
               </div>
               <div class="relative">
                 <input 

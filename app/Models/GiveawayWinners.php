@@ -6,14 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\Giveaway;
 
-class GiveawayUser extends Model
+class GiveawayWinners extends Model
 {
-    protected $fillable = ['giveaway_id', 'user_id', 'nonce', 'entered_at'];
-
-    protected $table = 'giveaway_user';
+    protected $fillable = ['giveaway_id', 'user_id', 'fair_roll', 'prize'];
 
     public function giveaway() {
-        return $this->belongsTo(Giveaway::class, 'giveaway_id');
+        return $this->belongsTo(Giveaway::class);
     }
 
     public function user() {

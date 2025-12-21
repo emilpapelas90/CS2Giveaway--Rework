@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->integer('is_blocked')->default(0);
             $table->integer('giveaways_won')->default(0);
             $table->string('password');
+            $table->string('client_seed')->default(Str::random(32));
             $table->rememberToken();
             $table->timestamps();
         });

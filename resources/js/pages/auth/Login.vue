@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import NewAppLayout from '@/layouts/NewAppLayout.vue';
 import InputError from '@/components/InputError.vue';
-import TextLink from '@/components/TextLink.vue';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthBase from '@/layouts/AuthLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue'
 
 defineProps<{
@@ -37,9 +30,9 @@ const submit = () => {
 
 <template>
  <NewAppLayout>
-  <div class="max-w-md w-full">
+  <div class="flex flex-1 items-center justify-center min-h-svh">
         <!-- Login Card -->
-        <div class="bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-8">
+        <div class="w-full max-w-lg bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 p-8">
           <div class="text-center mb-8">
             <h2 class="text-3xl font-bold text-white">Welcome Back</h2>
             <p class="text-gray-400 mt-2">Sign in to continue to SkinDrop</p>
@@ -49,7 +42,7 @@ const submit = () => {
           <form @submit.prevent="submit" class="space-y-6">
             <!-- Email/Username Input -->
             <div>
-              <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+              <label for="email" class="block text-white font-medium mb-1">Email</label>
               <input 
                 type="text" 
                 id="email" 
@@ -64,7 +57,7 @@ const submit = () => {
             <!-- Password Input -->
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label for="password" class="block text-sm font-medium text-gray-300">Password</label>
+                <label for="password" class="block text-white font-medium mb-1">Password</label>
                 <Link v-if="canResetPassword" :href="route('password.request')" class="text-sm text-orange-400 hover:text-orange-300 transition-colors duration-200">Forgot password?</Link>
               </div>
               <div class="relative">
