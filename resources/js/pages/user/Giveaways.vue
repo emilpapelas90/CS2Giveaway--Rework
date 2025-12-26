@@ -1,6 +1,6 @@
 <template>
  <NewAppLayout>
-  <div class="flex flex-1 items-center justify-center min-h-svh">
+  <div class="fle flex-1 items-center justify-center min-h-svh">
       <!-- Giveaways Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="(giveaway, i) in filteredGiveaways" :key="i"

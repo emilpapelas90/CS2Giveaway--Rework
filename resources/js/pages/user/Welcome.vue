@@ -6,7 +6,7 @@
 
 <template>
  <NewAppLayout>
-      <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+      <section class="relative px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto text-center">
           <h2 class="text-4xl md:text-6xl font-bold text-white mb-6">
             Win Epic 
@@ -117,7 +117,7 @@
       </section>
 
       <!-- How It Works Section -->
-      <section class="py-16 px-4 sm:px-6 lg:px-8">
+      <section class="py- px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
           <h3 class="text-3xl font-bold text-white text-center mb-12">
             ⚡ How It Works

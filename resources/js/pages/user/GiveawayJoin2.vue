@@ -243,11 +243,12 @@ onUnmounted(() => {
 
 <script setup lang="ts">
 import NewAppLayout from '@/layouts/NewAppLayout.vue';
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import moment from 'moment';
+import { Clock3 } from 'lucide-vue-next';
 
 const page = usePage();
 const form = useForm({});
@@ -270,8 +271,8 @@ const props = defineProps<{
 }>();
 
 /* Reactive copies */
-const giveaway = ref({ ...props.giveaway }) as any;
-const participants = ref<Array<any>>( (giveaway.value.participants || []).map((p:any) => ({ ...p, _isNew: false })) );
+const giveaway = reactive({ ...props.giveaway }) as any;
+const participants = reactive((giveaway.participants || []).map((p:any) => ({ ...p, _isNew: false })) );
 const winner = ref<any | null>(null);
 
 /* Animated entries */
@@ -345,6 +346,12 @@ function parseTime(t: string | null | undefined) {
 }
 
 /* computed */
+const displayTime = computed(() => {
+  if (timeRemaining.value === 'Waiting') return 'Waiting for min entries...';
+  if (timeRemaining.value === 'Ended' || timeRemaining.value === 'Finished') return 'Ended';
+  return timeRemaining.value; // countdown (e.g., 05:12)
+});
+
 const displayCount = computed(() => displayed.value);
 const formattedStart = computed(() => {
   if (!giveaway.value.start_time) return 'Not started';
@@ -354,6 +361,23 @@ const progressColor = computed(() => {
   if (progress.value >= 90) return 'bg-red-500';
   if (progress.value >= 60) return 'bg-amber-400';
   return 'bg-emerald-400';
+});
+
+
+const totalSlots = computed(() => Math.max(40, participants.length)); //ref(38);
+const emptySlots = computed(() => {
+  const filled = participants.length;
+  const empty = Math.max(totalSlots.value - filled, 0);
+
+  if (empty === 0) return [];
+
+  const minOpacity = 0.10;
+  const step = (1 - minOpacity) / (empty - 1 || 1);
+
+  return Array.from({ length: empty }, (_v, i) => ({
+    opacity: (1 - step * i).toFixed(2),
+    index: i, // used to stagger animations
+  }));
 });
 
 /* Animate numbers (tween) */
@@ -373,7 +397,6 @@ function animateNumber(from:number, to:number, duration = 500) {
 
 /* Countdown logic with strong guards */
 function startCountdownIfValid() {
-  // Clear any previous interval
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
   if (!giveaway.value.start_time || !giveaway.value.duration_minutes) {
@@ -442,16 +465,23 @@ function joinGiveaway(id:number) {
     onSuccess: (pageResponse:any) => {
       // backend likely broadcasts — UI will update from Echo
       entered.value = true;
-      // if response contains updated start_time, ensure countdown starts too
-      const st = pageResponse.props?.giveaway?.start_time ?? null;
-      if (st) {
-        giveaway.value.start_time = st;
+      
+      const updatedGiveaway = pageResponse.props?.giveaway;
+      if (updatedGiveaway && typeof updatedGiveaway === 'object') {
+        Object.assign(giveaway, updatedGiveaway); // merge instead of overwrite
         startCountdownIfValid();
       }
+
+      //const st = pageResponse.props?.giveaway?.start_time ?? null;
+      // if (st) {
+      //   giveaway.value.start_time = st;
+      //   startCountdownIfValid();
+      // }
+      
       if (page.props.flash?.success) {
-        // show toast if available
         try { (window as any).toast?.success?.(page.props.flash.success); } catch {}
-    }
+      }
+
     },
     onError: () => {
       // show error toast if available
@@ -481,8 +511,11 @@ function subscribeEcho() {
   const ch = (window as any).Echo.private(echoChannelName);
 
   ch.listen('.GiveawayUpdated', (payload: any) => {
+
     if (!payload?.giveaway) return;
     const g = payload.giveaway;
+
+    console.log(g);
 
     // --- entries animation
     const old = targetCount.value;
@@ -508,8 +541,8 @@ function subscribeEcho() {
         return;
       }
 
-      giveaway.value.start_time = g.start_time;
-      giveaway.value.duration_minutes = g.duration_minutes; // update it safely
+      giveaway.start_time = g.start_time;
+      giveaway.duration_minutes = g.duration_minutes; // update it safely
       lastStartMs = newStartMs;
 
       startCountdownIfValid(); // start only after full validation
@@ -522,11 +555,13 @@ function subscribeEcho() {
     // --- participants list: add any new ones
     if (Array.isArray(g.participants)) {
       g.participants.forEach((p:any) => {
-        const exists = participants.value.some(pp => pp.id === p.id);
-        if (!exists) {
-          const newP = { ...p, _isNew: true };
-          participants.value.unshift(newP);
+          const index = participants.findIndex((pp:any) => pp.id == p.id);
+        if (index === -1) {
+          const newP = reactive({ ...p, _isNew: true });
+          participants.unshift(newP);
           setTimeout(() => (newP._isNew = false), 1500);
+        } else {
+          Object.assign(participants[index], p);
         }
       });
     }
@@ -552,6 +587,22 @@ function subscribeEcho() {
     }
   })
 }
+
+// const participants = reactive([
+//   { id: 1, name: 'Alice', _isNew: false },
+//   { id: 2, name: 'Bob', _isNew: false },
+//   { id: 3, name: 'Charlie', _isNew: false },
+// ]);
+
+// let nextId = 4;
+// function addRandomParticipant() {
+//   const names = ['David', 'Eve', 'Frank', 'Grace', 'Hannah', 'Ivy'];
+//   const name = names[Math.floor(Math.random() * names.length)] + ' ' + nextId;
+//   const newP = reactive({ id: nextId++, name, _isNew: true });
+//   participants.unshift(newP);
+
+//   setTimeout(() => { newP._isNew = false; }, 1500);
+// }
 
 /* initial setup */
 onMounted(() => {
@@ -581,91 +632,50 @@ onUnmounted(() => {
   <NewAppLayout>
 
     <!-- bg-[#0f1923] -->
+  <div class="mx-6">
   
-   <div v-if="timeRemaining === 'Finished'" class="w-full max-w-6xl bg-black/40 backdrop-blur-md rounded-xl border border-red-500/20 mt-4 p-4 text-red-400 hover:border-red-500/40 transition-all duration-300 mb-4">
-     <div class="flex items-center gap-3">
+   <div v-if="displayTime === 'Ended'" class="w-full mx-auto max-w-7xl bg-black/40 backdrop-blur-md rounded-xl border border-red-500/20 p-3 text-red-400 hover:border-red-500/40 transition-all duration-300 mb-4">
+     <div class="flex items-center justify-center gap-3">
       <p class="text-sm font-medium">This giveaway has ended. You can no longer join.</p>
      </div>
    </div>
 
-   <div v-if="props.flash.error" class="w-full max-w-6xl bg-black/40 backdrop-blur-md rounded-xl border border-red-500/20 mt-4 p-4 text-red-400 hover:border-red-500/40 transition-all duration-300 mb-4">
-     <div class="flex items-center gap-3">
+   <div v-if="props.flash.error" class="w-full max-w-7xl bg-black/40 backdrop-blur-md rounded-xl border border-red-500/20 p-4 text-red-400 hover:border-red-500/40 transition-all duration-300 mb-4">
+     <div class="flex items-center justify-center gap-3">
        <p class="text-sm font-medium">{{ props.flash.error }}</p>
      </div>
    </div>
 
-   <div class="flex justify-center min-h-scree min-h-svh text-white p-6">
-    <div class="max-w-7xl mx-auto">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-[#1a2634] rounded-lg p- border border-[#2a3a4a] relative overflow-hidden">
-          <div class="flex items-center justify-center mb-6 relative z-10">
+   <div class="flex justify-center min-h-scree min-h-svh text-white">
+    <div class="w-full max-w-7xl mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
+        <div class="col-span-2 py-4 bg-[#1a2634] rounded-lg p- border border-[#2a3a4a] relative overflow-hidden">
+          <div class="flex items-center justify-center relative z-10">
             <img 
               :src="giveaway.image" 
               :alt="giveaway.skin_name"
-              class="w-full max-w-xs object-contain"
+              class="w-full h-44 max-w-xs object-contain hover:scale-110 transition-transform duration-300"
             />
           </div>
-          <div class="space-y-2 mx-3 mb-4">
+          <div class="space-y-2 mx-4">
             <!-- <p class="text-gray-400 text-sm uppercase tracking-wide">NOVA</p> -->
-            <h2 class="text-2xl font-bold">
+            <h2 class="text-lg font-bold">
               <!-- StatTrak<sup class="text-sm">™</sup> Wood Fired -->
                <!-- {{ giveaway.skin_name }} -->
                {{ getSkinTitle(giveaway.skin_name) }}
             </h2>
             <p class="text-gray-400 text-sm">{{ getCondition(giveaway.skin_name) }}</p>
-            <p class="text-green-400 text-3xl font-bold mt-4">$ {{giveaway.value}}</p>
+            <p class="text-green-400 text-md font-bold mt-2">$ {{giveaway.value}}</p>
           </div>
           <div class="absolute bottom-0 left-0 right-0 h-1" :style="{ backgroundColor: `#${giveaway.rarity}` }"></div>
         </div>
 
-        <div class="space-y-4">
-          <div class="bg-gradient-to-br from-[#2a3d2e] to-[#1a2d1e] rounded-lg p-6 border-2 border-green-700/50">
-            <div class="flex items-start justify-between gap-4">
-              <div class="flex items-start gap-4">
-                <div class="bg-[#3a4d3e] p-3 rounded-lg">
-                  <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="text-xl font-bold mb-2">Steam Level 5+</h3>
-                  <p class="text-gray-300 text-sm">Meet the requirements to join: have Steam level 5. Good luck!</p>
-                </div>
-              </div>
-              <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold whitespace-nowrap flex items-center gap-2 transition-colors">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                </svg>
-                YOU'RE IN!
-              </button>
-            </div>
-          </div>
+        <div class="col-span-2 flex flex-col space-y-4">
 
-          <!-- <div class="bg-[#1a2634] rounded-lg p-6 border border-[#2a3a4a]">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <div class="bg-[#3d3416] p-3 rounded-lg">
-                  <svg class="w-8 h-8 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 100 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 100-4V6z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">YOUR TICKETS</p>
-                  <p class="text-4xl font-bold">1</p>
-                </div>
-              </div>
-              <button class="bg-[#2a3a4a] hover:bg-[#3a4a5a] p-3 rounded-full transition-colors">
-                <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                </svg>
-              </button>
-            </div>
-          </div> -->
+          <div class="p- borde border-[#2a3a4a]">
+            <div class="grid grid-cols-2 gap-3">
 
-          <div class="bg-[#1a2634] rounded-lg p-6 border border-[#2a3a4a]">
-            <div class="grid grid-cols-2 gap-6">
-
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-3 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
                 <div class="bg-[#3d3416] p-2 rounded-lg">
                   <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
@@ -677,7 +687,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-3 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
                 <div class="bg-[#3d3416] p-2 rounded-lg">
                   <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
@@ -689,7 +699,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-3 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
                 <div class="bg-[#2a3a4a] p-2 rounded-lg">
                   <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
@@ -701,7 +711,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-3 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
                 <div class="bg-[#3d3416] p-2 rounded-lg">
                   <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -714,7 +724,52 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
+
+
+          <div class="mb-4 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs text-slate-300">
+                
+
+                <div class="flex items-center justify-cente text-xs">
+                  <div class="bg-[#0f1923] border border-[#2a3a4a] rounded-lg p-1 mr-2">
+                   <Clock3 class="w-4 h-4"/>
+                  </div>
+                  <!-- <span v-if="timeRemaining === 'Waiting'">Waiting for min entries...</span>
+                  <span v-else-if="timeRemaining === 'Ended'">Ended</span> -->
+                  <span class="mt-2">{{ displayTime }}</span>
+                </div>
+                <!-- <span v-else>Ends in: {{ timeRemaining }}</span> -->
+              </div>
+              <span class="text-xs mt-2 text-slate-400">{{ formattedStart }}</span>
+            </div>
+
+            <div class="w-full h-2.5 bg-[#0f1923] rounded-full overflow-hidden">
+              <div
+                class="h-full rounded-full transform origin-left transition-all duration-1000 ease-out"
+                :class="progressColor"
+                :style="{ width: `${progress}%` }"
+              ></div>
+            </div>
+          </div>
+
+          <!-- <Button @click="joinGiveaway(giveaway.id)" :disabled="giveaway.entered" class="flex justify-center w-full text-white py-3 mt-4 rounded-lg font-semibold transition-all duration-200" :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-900'">
+            {{ giveaway.entered ? '✅ Joined' : '🎯 Join Giveaway' }}
+          </Button> -->
+
+          <div class="mt-auto">
+            <button @click="joinGiveaway(giveaway.id)" :disabled="giveaway.entered" class="bg-gradient-to-br from-[#2a3d2e] to-[#1a2d1e] border-2 border-green-700/50 text-white text-sm px-4 py-2 rounded-lg font-bold whitespace-nowrap w-full flex items-center justify-center gap-2 transition-colors"
+             :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-900'">
+                <svg v-if="giveaway.entered" class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                {{ giveaway.entered ? 'Joined' : 'Join the Giveaway' }}
+                <!-- YOU'RE IN! -->
+            </button>
+          </div>
+
         </div>
+
       </div>
 
       <div class="mt-8 bg-[#1a2634] rounded-lg p-6 border border-[#2a3a4a]">
@@ -722,24 +777,35 @@ onUnmounted(() => {
           <svg class="w-7 h-7 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
           </svg>
-          <h3 class="text-2xl font-bold">Participants (9)</h3>
+          <h3 class="text-2xl font-bold">Participants ({{ participants.length }})</h3>
         </div>
         <div class="flex flex-wrap gap-3">
-          <div v-for="i in 9" :key="i" class="w-14 h-14 rounded-lg bg-[#2a3a4a] overflow-hidden">
-            <img 
-              :src="`/placeholder.svg?height=56&width=56&query=gaming avatar ${i}`" 
-              :alt="`Participant ${i}`"
-              class="w-full h-full object-cover"
-            />
+          <div v-for="(p, i) in participants" :key="`p-${p.id}`"
+          :class="['w-12 h-12 rounded-lg overflow-hidden', { 'animate-slideRight': p._isNew }]" 
+          :style="{ animationDelay: (i * 50) + 'ms' }"
+          class="bg-[#2a3a4a]" >
+            <img :src="`https://ui-avatars.com/api/?name=${p.name}`" 
+              :alt="`Participant ${p.name}`"
+              class="w-full h-full object-cover"/>
           </div>
-          <div v-for="i in 15" :key="`empty-${i}`" class="w-14 h-14 rounded-lg bg-[#0f1923] border border-[#2a3a4a]"></div>
+
+          <div v-for="(slot, i) in emptySlots" :key="`empty-${i}`" 
+          class="p_list w-12 h-12 rounded-lg bg-[#0f1923] border border-[#2a3a4a] transition-all duration-300 hover:scale-105" 
+          :style="{ opacity: slot.opacity, animationDelay: (slot.index * 38) + 'ms', }"></div>
+
         </div>
       </div>
+
+
+      <button @click="addRandomParticipant" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">
+        Add Random Participant
+      </button>
 
     </div>
 
    </div>
-   
+
+  </div>
 
   <!-- <div class="flex flex-col items-center justify-center min-h-svh">
 
@@ -885,9 +951,35 @@ onUnmounted(() => {
 
 </template>
 
-
 <style scoped>
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.95);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
 
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.p_list {
+  animation: fadeUp 0.4s ease both;
+}
+
+.animate-slideRight  {
+  animation: slideRight 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
 
 /* .fade-zoom-enter-active,
 .fade-zoom-leave-active {

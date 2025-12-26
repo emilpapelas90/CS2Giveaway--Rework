@@ -28,7 +28,9 @@ class GiveawayController extends Controller
     }
 
     public function giveaways() {
-      $giveaways = Giveaway::where('is_active', 1)->where(function ($q) { $q->whereNull('start_time'); })->get();
+      //$giveaways = Giveaway::where('is_active', 1)->where(function ($q) { $q->whereNull('start_time'); })->get();
+
+      $giveaways = Giveaway::where('is_active', 0)->get();
 
       return Inertia::render('user/Giveaways', ['giveaways' => $giveaways]);
     }

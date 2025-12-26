@@ -91,7 +91,7 @@ class ProcessGiveawaysJob implements ShouldQueue
 
             $giveaway->update([
                 'revealed_server_seed' => $giveaway->server_seed,
-                'is_active'            => 0,
+                'is_active' => 0,
             ]);
 
             event(new GiveawayEnded(

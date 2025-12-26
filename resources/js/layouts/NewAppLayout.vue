@@ -250,7 +250,7 @@ const handleClickOutside = (event) => {
       <slot/>
     </main> -->
     
-    <main class="mx-auto flex min-h-svh w-full max-w-7x flex-1 flex-col px-2 sm:px-6 lg:px-8">
+    <main class="mx-auto flex min-h-svh w-full max-w-7x flex-1 flex-col py-16 px-2 sm:px-6 lg:px-8">
       <slot/>
     </main>
 
