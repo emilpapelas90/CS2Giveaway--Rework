@@ -43,13 +43,35 @@ class GiveawayController extends Controller
 
     public function join($id) {
 
-      $giveaway = Giveaway::with(['winner.user', 'participants'])->findOrFail($id);
+      //$giveaway = Giveaway::with(['winner.user', 'participants'])->findOrFail($id);
+      $giveaway = Giveaway::with([
+        'winner.user',
+        'participants' => function($q) {
+            $q->withPivot('entered_at'); // make sure pivot data is loaded
+      }])->findOrFail($id);
       $user = auth()->user();
 
       // Check if user already joined
       $entered = $giveaway->participants->pluck('id')->contains($user->id);
 
       $requirements = $giveaway->requirements;
+
+    //   $participants = $giveaway->participants
+    //     ->sortByDesc(fn($user) => strtotime($user->pivot->entered_at ?? now()))
+    //     ->values() // reindex the collection so JSON preserves order
+    //     ->map(fn($user) => [
+    //         'id' => $user->id,
+    //         'name' => $user->name,
+    //         'entered_at' => $user->pivot->entered_at,
+    //   ]);
+
+      $participants = $giveaway->participants->map(fn($user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'entered_at' => $user->pivot->entered_at,
+      ]);
+
+      //dd($participants);
 
       return Inertia::render('user/GiveawayJoin2', [
           'giveaway' => [
@@ -74,10 +96,7 @@ class GiveawayController extends Controller
                       'name' => $giveaway->winner->user->name,
                   ],
               ] : null,
-              'participants' => $giveaway->participants->map(fn($user) => [
-                  'id' => $user->id,
-                  'name' => $user->name,
-              ]),
+              'participants' => $participants
           ],
           'requirements' => $requirements,
       ]);

@@ -38,11 +38,11 @@ class Giveaway extends Model
     }
 
     public function entries() {
-        return $this->hasMany(GiveawayUser::class, 'giveaway_id');
+      return $this->hasMany(GiveawayUser::class, 'giveaway_id');
     }
 
     public function participants() {
-      return $this->belongsToMany(User::class, 'giveaway_user');
+      return $this->belongsToMany(User::class, 'giveaway_user')->withPivot('entered_at');
     }
 
     public function getEnteredAttribute() {

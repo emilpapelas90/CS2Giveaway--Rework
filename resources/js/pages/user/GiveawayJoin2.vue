@@ -1,246 +1,3 @@
-<!-- <script setup lang="ts">
-import NewAppLayout from '@/layouts/NewAppLayout.vue';
-import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { useInitials } from '@/composables/useInitials';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
-import type { Ref } from 'vue';
-import { AlarmClock } from 'lucide-vue-next';
-import { Toaster } from '@/components/ui/sonner';
-import 'vue-sonner/style.css';
-import { toast } from 'vue-sonner';
-import moment from 'moment';
-import confetti from "canvas-confetti";
-
-const page = usePage();
-const form = useForm({});
-
-const props = defineProps<{
-  giveaway: {
-    id: number;
-    skin_name: string;
-    skin_image: string;
-    value: string | number;
-    rarity?: string;
-    entries: number;
-    participants: Array<{ id: number; name: string; entered_at?: string; ticketCount?: number }>;
-    min_entries?: number;
-    start_time?: string | null;
-    duration_minutes?: number;
-  },
-  flash: {
-   required: true,
-  }
-}>();
-
-// reactive copy
-const giveaway = ref({ ...props.giveaway }) as Ref<any>;
-
-// participants state (clone so we can add _isNew flag)
-const participants = ref<Array<any>>(giveaway.value.participants.map((p: any) => ({ ...p, _isNew: false })));
-const winner = ref<any>(null);
-
-// animated count
-const displayed = ref<number>(giveaway.value.entries || 0);
-const targetCount = ref<number>(giveaway.value.entries || 0);
-const animFrame = ref<number | null>(null);
-const isIncreasing = ref(false);
-
-// timer + progress
-const timeRemaining = ref<string>(giveaway.value.start_time ? '...' : 'Waiting');
-const progress = ref<number>(giveaway.value.start_time ? 0 : 0);
-let timerInterval: number | null = null;
-
-// formatted start time
-const formattedStart = computed(() => {
-  if (!giveaway.value.start_time) return 'Not started';
-  try {
-    const d = new Date(giveaway.value.start_time);
-    return d.toLocaleString();
-  } catch {
-    return giveaway.value.start_time;
-  }
-});
-
-// progress color computed
-const progressColor = computed(() => {
-  if (progress.value >= 90) return 'bg-red-500';
-  if (progress.value >= 60) return 'bg-amber-400';
-  return 'bg-emerald-400';
-});
-
-// helper: initials
-function initials(name: string) {
-  if (!name) return 'U';
-  return name.split(' ').map(s => s[0] ?? '').slice(0,2).join('').toUpperCase();
-}
-
-const getSkinTitle = (skinName: string) => {
-  return skinName.split(' (')[0];
-}
-
-const getCondition = (skinName: string) => {
-  const match = skinName.match(/\(([^)]+)\)/);
-  return match ? match[1] : '';
-}
-
-const formatDate = (date: any) => {
-  return moment(date).format('MMM D, YYYY')
-};
-
-// animate number function (tween)
-function animateNumber(from: number, to: number, duration = 500) {
-  const start = performance.now();
-  if (animFrame.value) cancelAnimationFrame(animFrame.value);
-
-  function tick(now: number) {
-    const elapsed = now - start;
-    const t = Math.min(1, elapsed / duration);
-    // easeOutCubic
-    const eased = 1 - Math.pow(1 - t, 3);
-    displayed.value = Math.round(from + (to - from) * eased);
-    if (t < 1) {
-      animFrame.value = requestAnimationFrame(tick);
-    } else {
-      displayed.value = to;
-      animFrame.value = null;
-    }
-  }
-
-  animFrame.value = requestAnimationFrame(tick);
-}
-
-
-onMounted(() => {
-  window.Echo.private(`giveaway.${props.giveaway.id}`).listen(".GiveawayUpdated", (event: any) => {
-
-    console.log("START TIME RECEIVED:", event.giveaway.start_time);
-
-    const old = targetCount.value;
-    const newEntries = Number(event.giveaway.entries || 0);
-
-    targetCount.value = newEntries;
-    isIncreasing.value = newEntries > old;
-    animateNumber(displayed.value, newEntries, 600);
-
-    // update start_time
-    
-    giveaway.value.start_time = event.giveaway.start_time;
-    startCountdown();
-
-    if (event.giveaway.participants && Array.isArray(event.giveaway.participants)) {
-
-        event.giveaway.participants.forEach((p: any) => {
-            const exists = participants.value.some(pp => pp.id === p.id);
-
-            if (!exists) {
-                const newP = { ...p, _isNew: true };
-                participants.value.unshift(newP);
-
-                // remove highlight later
-                setTimeout(() => (newP._isNew = false), 1500);
-            }
-        });
-    }
-
-    // WINNER
-    if (event.giveaway.winner) {
-        winner.value = event.giveaway.winner;
-
-        confetti({
-            particleCount: 200,
-            spread: 70,
-            origin: { y: 0.6 },
-        });
-    }
-
-  });
-});
-
-function startCountdown() {
-  if (timerInterval) clearInterval(timerInterval);
-
-  const startTime = giveaway.value.start_time;
-  const duration = giveaway.value.duration_minutes;
-
-  // Missing or empty start
-  if (!startTime || startTime === "0") {
-    timeRemaining.value = "Waiting";
-    progress.value = 0;
-    return;
-  }
-
-  const start = new Date(startTime).getTime();
-  const now = Date.now();
-
-  // ❗Prevent weird backend values (start time older than 1 minute)
-  if (now - start > 60 * 1000) {
-    console.warn("Ignored invalid old start_time broadcast:", startTime);
-    return;
-  }
-
-  const endTime = start + duration * 60 * 1000;
-
-  timerInterval = window.setInterval(() => {
-    const remaining = endTime - Date.now();
-
-    if (remaining <= 0) {
-      timeRemaining.value = "Finished";
-      progress.value = 100;
-      clearInterval(timerInterval!);
-      return;
-    }
-
-    timeRemaining.value = formatTime(remaining);
-
-    const total = duration * 60 * 1000;
-    progress.value = Math.min(100, ((total - remaining) / total) * 100);
-  }, 1000);
-}
-
-// format ms -> "Xd Xh Xm Xs"
-function formatTime(ms: number) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
-
-const joinGiveaway = (id: number) => {
-  //isJoining.value = true;
-  form.post(route("giveaway.enter", id), {
-    preserveScroll: true,
-    onSuccess: () => {
-      //isJoining.value = false;
-      toast("Success", {
-        description: page.props.flash.success,
-      });
-    },
-    onError: () => {
-      toast("Error", {
-        description: form.errors.giveaway,
-      });
-    },
-  });
-};
-
-const displayCount = computed(() => displayed.value);
-
-onUnmounted(() => {
-  if (animFrame.value) cancelAnimationFrame(animFrame.value);
-  if (timerInterval) clearInterval(timerInterval);
-});
-</script> -->
-
 <script setup lang="ts">
 import NewAppLayout from '@/layouts/NewAppLayout.vue';
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
@@ -261,7 +18,7 @@ const props = defineProps<{
     value: string | number;
     rarity?: string;
     entries: number;
-    participants: Array<{ id: number; name: string; entered_at?: string; ticketCount?: number }>;
+    participants: Array<{ id: number; name: string; }>;
     min_entries?: number;
     start_time?: string | null;
     duration_minutes?: number;
@@ -272,17 +29,24 @@ const props = defineProps<{
 
 /* Reactive copies */
 const giveaway = reactive({ ...props.giveaway }) as any;
-const participants = reactive((giveaway.participants || []).map((p:any) => ({ ...p, _isNew: false })) );
+const participants = ref((giveaway.participants || []).map((p:any) => ({ ...p, _isNew: false })));
+
+// const participants = ref((giveaway.participants || []).map((p:any) => ({ ...p, _isNew: false })).sort((a:any, b:any) => {
+//   if(a.entered_at && b.entered_at) {
+//     return new Date(a.entered_at).getTime() - new Date(b.entered_at).getTime();
+//   }
+//   return 0;
+// }));
 const winner = ref<any | null>(null);
 
 /* Animated entries */
-const displayed = ref<number>(giveaway.value.entries || 0);
-const targetCount = ref<number>(giveaway.value.entries || 0);
+const displayed = ref<number>(giveaway.entries || 0);
+const targetCount = ref<number>(giveaway.entries || 0);
 const isIncreasing = ref(false);
 let animFrame: number | null = null;
 
 /* Countdown/progress */
-const timeRemaining = ref<string>(giveaway.value.start_time ? '...' : 'Waiting');
+const timeRemaining = ref<string>(giveaway.start_time ? '...' : 'Waiting');
 const progress = ref<number>(0);
 let timerInterval: number | null = null;
 
@@ -290,7 +54,7 @@ let timerInterval: number | null = null;
 const entered = ref<boolean>(!!props.entered);
 
 /* Keep the last validated start timestamp to avoid older broadcasts */
-let lastStartMs: number | null = giveaway.value.start_time ? parseTime(giveaway.value.start_time) : null;
+let lastStartMs: number | null = giveaway.start_time ? parseTime(giveaway.start_time) : null;
 
 
 function simulateWinner(id:number) {
@@ -323,7 +87,6 @@ const getCondition = (skinName: string) => {
   return match ? match[1] : '';
 }
 
-
 function formatTime(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const days = Math.floor(totalSeconds / 86400);
@@ -335,6 +98,7 @@ function formatTime(ms: number) {
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
 }
+
 function parseTime(t: string | null | undefined) {
   if (!t) return null;
   // Accept both "2025-12-09 18:49:37" and ISO
@@ -345,18 +109,28 @@ function parseTime(t: string | null | undefined) {
   return m.isValid() ? m.valueOf() : null;
 }
 
-/* computed */
 const displayTime = computed(() => {
-  if (timeRemaining.value === 'Waiting') return 'Waiting for min entries...';
-  if (timeRemaining.value === 'Ended' || timeRemaining.value === 'Finished') return 'Ended';
-  return timeRemaining.value; // countdown (e.g., 05:12)
+  switch (timeRemaining.value) {
+    case "Waiting":
+      return "Waiting for more participants...";
+    case "Ended":
+    case "Finished":
+      return "Ended";
+    default:
+      return timeRemaining.value;
+  }
 });
 
-const displayCount = computed(() => displayed.value);
 const formattedStart = computed(() => {
-  if (!giveaway.value.start_time) return 'Not started';
-  try { return new Date(giveaway.value.start_time).toLocaleString(); } catch { return String(giveaway.value.start_time); }
+  if (!giveaway.start_time) return "Not started";
+
+  try {
+    return new Date(giveaway.start_time).toLocaleString();
+  } catch {
+    return String(giveaway.start_time);
+  }
 });
+
 const progressColor = computed(() => {
   if (progress.value >= 90) return 'bg-red-500';
   if (progress.value >= 60) return 'bg-amber-400';
@@ -364,9 +138,9 @@ const progressColor = computed(() => {
 });
 
 
-const totalSlots = computed(() => Math.max(40, participants.length)); //ref(38);
+const totalSlots = computed(() => Math.max(40, participants.value.length)); //ref(38);
 const emptySlots = computed(() => {
-  const filled = participants.length;
+  const filled = participants.value.length;
   const empty = Math.max(totalSlots.value - filled, 0);
 
   if (empty === 0) return [];
@@ -376,11 +150,10 @@ const emptySlots = computed(() => {
 
   return Array.from({ length: empty }, (_v, i) => ({
     opacity: (1 - step * i).toFixed(2),
-    index: i, // used to stagger animations
+    index: i,
   }));
 });
 
-/* Animate numbers (tween) */
 function animateNumber(from:number, to:number, duration = 500) {
   const start = performance.now();
   if (animFrame) cancelAnimationFrame(animFrame);
@@ -395,18 +168,17 @@ function animateNumber(from:number, to:number, duration = 500) {
   animFrame = requestAnimationFrame(tick);
 }
 
-/* Countdown logic with strong guards */
 function startCountdownIfValid() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
-  if (!giveaway.value.start_time || !giveaway.value.duration_minutes) {
+  if (!giveaway.start_time || !giveaway.duration_minutes) {
     timeRemaining.value = 'Waiting';
     progress.value = 0;
     return;
   }
 
-  const startMs = parseTime(giveaway.value.start_time);
-  const durationMs = Number(giveaway.value.duration_minutes || 0) * 60 * 1000;
+  const startMs = parseTime(giveaway.start_time);
+  const durationMs = Number(giveaway.duration_minutes || 0) * 60 * 1000;
   if (!startMs || durationMs <= 0) {
     timeRemaining.value = 'Waiting';
     progress.value = 0;
@@ -415,7 +187,6 @@ function startCountdownIfValid() {
 
   // Ignore broadcasts that are older than the last accepted start_time
   if (lastStartMs && startMs < lastStartMs) {
-    // older -> ignore
     return;
   }
 
@@ -423,22 +194,18 @@ function startCountdownIfValid() {
   lastStartMs = startMs;
 
   const now = Date.now();
+  const endMs = startMs + durationMs;
 
   // If start is in the future -> show waiting
   if (now < startMs) {
     timeRemaining.value = 'Waiting';
     progress.value = 0;
     return;
-  }
-
-  const endMs = startMs + durationMs;
-
-  // If already expired, finish
-  if (now >= endMs) {
+  } else if (now >= endMs) {
     timeRemaining.value = 'Finished';
     progress.value = 100;
     return;
-  }
+  } else {
 
   // Start ticking
   const tick = () => {
@@ -456,6 +223,7 @@ function startCountdownIfValid() {
 
   tick();
   timerInterval = window.setInterval(tick, 1000);
+ }
 }
 
 /* Join (Inertia) */
@@ -468,16 +236,18 @@ function joinGiveaway(id:number) {
       
       const updatedGiveaway = pageResponse.props?.giveaway;
       if (updatedGiveaway && typeof updatedGiveaway === 'object') {
+
+        giveaway.entries = updatedGiveaway.entries ?? giveaway.entries;
+        giveaway.participants = updatedGiveaway.participants ?? giveaway.participants;
+
+        const old = displayed.value;
+        const newEntries = Number(giveaway.entries);
+        animateNumber(old, newEntries, 600);
+
         Object.assign(giveaway, updatedGiveaway); // merge instead of overwrite
         startCountdownIfValid();
       }
 
-      //const st = pageResponse.props?.giveaway?.start_time ?? null;
-      // if (st) {
-      //   giveaway.value.start_time = st;
-      //   startCountdownIfValid();
-      // }
-      
       if (page.props.flash?.success) {
         try { (window as any).toast?.success?.(page.props.flash.success); } catch {}
       }
@@ -515,8 +285,6 @@ function subscribeEcho() {
     if (!payload?.giveaway) return;
     const g = payload.giveaway;
 
-    console.log(g);
-
     // --- entries animation
     const old = targetCount.value;
     const newEntries = Number(g.entries || 0);
@@ -525,46 +293,50 @@ function subscribeEcho() {
     animateNumber(displayed.value, newEntries, 600);
 
     // --- start time (validate) and restart countdown if valid
-   if (g.start_time !== null && g.start_time !== undefined) {
 
-    const newStartMs = parseTime(g.start_time);
 
-    // invalid or older -> ignore
-    if (!newStartMs || (lastStartMs && newStartMs < lastStartMs)) {
-      console.warn("Ignoring outdated start_time:", g.start_time);
-    } 
-    else {
 
-      // ❗ DO NOT ACCEPT if duration_minutes is missing or zero
-      if (!g.duration_minutes || g.duration_minutes < 1) {
-        console.warn("Ignoring broadcast with invalid duration_minutes:", g.duration_minutes);
-        return;
-      }
+   //if (g.start_time !== null && g.start_time !== undefined) {
 
-      giveaway.start_time = g.start_time;
-      giveaway.duration_minutes = g.duration_minutes; // update it safely
-      lastStartMs = newStartMs;
+    //const newStartMs = parseTime(g.start_time);
 
-      startCountdownIfValid(); // start only after full validation
-    }
+    // if (!newStartMs || (lastStartMs && newStartMs < lastStartMs)) {
+    //   console.warn("Ignoring outdated start_time:", g.start_time);
+    // } 
+    // else {
 
-    } else {
-    console.warn("Ignoring null start_time broadcast");
-   }
+    //   // ❗ DO NOT ACCEPT if duration_minutes is missing or zero
+    //   if (!g.duration_minutes || g.duration_minutes < 1) {
+    //     console.warn("Ignoring broadcast with invalid duration_minutes:", g.duration_minutes);
+    //     return;
+    //   }
+
+    //   giveaway.start_time = g.start_time;
+    //   giveaway.duration_minutes = g.duration_minutes;
+    //   lastStartMs = newStartMs;
+
+    //   startCountdownIfValid();
+    //}
+
+    // } else {
+    //  console.warn("Ignoring null start_time broadcast");
+    // }
 
     // --- participants list: add any new ones
     if (Array.isArray(g.participants)) {
       g.participants.forEach((p:any) => {
-          const index = participants.findIndex((pp:any) => pp.id == p.id);
+          const index = participants.value.findIndex((pp:any) => pp.id == p.id);
         if (index === -1) {
           const newP = reactive({ ...p, _isNew: true });
-          participants.unshift(newP);
+          //participants.value.unshift(newP);
+          participants.value.push(newP);
           setTimeout(() => (newP._isNew = false), 1500);
         } else {
-          Object.assign(participants[index], p);
+          Object.assign(participants.value[index], p);
         }
       });
     }
+
   });
 
   ch.listen('.GiveawayEnded', (payload:any) => {
@@ -606,12 +378,9 @@ function subscribeEcho() {
 
 /* initial setup */
 onMounted(() => {
-  // set initial animations
-  displayed.value = giveaway.value.entries || 0;
-  targetCount.value = giveaway.value.entries || 0;
-  // if giveaway already running, start countdown
+  displayed.value = giveaway.entries || 0;
+  targetCount.value = giveaway.entries || 0;
   startCountdownIfValid();
-  // subscribe to Echo after mount (if Echo exists)
   subscribeEcho();
 });
 
@@ -629,7 +398,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <NewAppLayout>
+ <NewAppLayout>
 
     <!-- bg-[#0f1923] -->
   <div class="mx-6">
@@ -649,15 +418,12 @@ onUnmounted(() => {
    <div class="flex justify-center min-h-scree min-h-svh text-white">
     <div class="w-full max-w-7xl mx-auto">
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
-        <div class="col-span-2 py-4 bg-[#1a2634] rounded-lg p- border border-[#2a3a4a] relative overflow-hidden">
+        <div class="flex flex-col col-span-2 py-4 bg-[#1a2634] rounded-lg p- border border-[#2a3a4a] relative overflow-hidden">
           <div class="flex items-center justify-center relative z-10">
-            <img 
-              :src="giveaway.image" 
-              :alt="giveaway.skin_name"
-              class="w-full h-44 max-w-xs object-contain hover:scale-110 transition-transform duration-300"
-            />
+            <img :src="giveaway.image" :alt="giveaway.skin_name"
+              class="w-full h-44 max-w-xs object-contain hover:scale-110 transition-transform duration-300"/>
           </div>
-          <div class="space-y-2 mx-4">
+          <div class="space-y-2 mx-4 mt-auto">
             <!-- <p class="text-gray-400 text-sm uppercase tracking-wide">NOVA</p> -->
             <h2 class="text-lg font-bold">
               <!-- StatTrak<sup class="text-sm">™</sup> Wood Fired -->
@@ -729,19 +495,14 @@ onUnmounted(() => {
           <div class="mb-4 bg-[#1a2634] rounded-lg p-3 border border-[#2a3a4a]">
             <div class="flex items-center justify-between mb-2">
               <div class="text-xs text-slate-300">
-                
-
                 <div class="flex items-center justify-cente text-xs">
                   <div class="bg-[#0f1923] border border-[#2a3a4a] rounded-lg p-1 mr-2">
                    <Clock3 class="w-4 h-4"/>
                   </div>
-                  <!-- <span v-if="timeRemaining === 'Waiting'">Waiting for min entries...</span>
-                  <span v-else-if="timeRemaining === 'Ended'">Ended</span> -->
-                  <span class="mt-2">{{ displayTime }}</span>
+                  <span class="mt-2 italic">{{ displayTime }}</span>
                 </div>
-                <!-- <span v-else>Ends in: {{ timeRemaining }}</span> -->
               </div>
-              <span class="text-xs mt-2 text-slate-400">{{ formattedStart }}</span>
+              <span class="text-xs italic mt-2 text-slate-400">{{ formattedStart }}</span>
             </div>
 
             <div class="w-full h-2.5 bg-[#0f1923] rounded-full overflow-hidden">
@@ -772,6 +533,10 @@ onUnmounted(() => {
 
       </div>
 
+
+      {{ giveaway.participants }}
+      {{ participants }}
+
       <div class="mt-8 bg-[#1a2634] rounded-lg p-6 border border-[#2a3a4a]">
         <div class="flex items-center gap-3 mb-6">
           <svg class="w-7 h-7 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -780,7 +545,7 @@ onUnmounted(() => {
           <h3 class="text-2xl font-bold">Participants ({{ participants.length }})</h3>
         </div>
         <div class="flex flex-wrap gap-3">
-          <div v-for="(p, i) in participants" :key="`p-${p.id}`"
+          <div v-for="(p, i) in participants.slice().reverse()" :key="`p-${i}`"
           :class="['w-12 h-12 rounded-lg overflow-hidden', { 'animate-slideRight': p._isNew }]" 
           :style="{ animationDelay: (i * 50) + 'ms' }"
           class="bg-[#2a3a4a]" >
@@ -806,149 +571,7 @@ onUnmounted(() => {
    </div>
 
   </div>
-
-  <!-- <div class="flex flex-col items-center justify-center min-h-svh">
-
-    <div v-if="timeRemaining === 'Ended'" class="w-full max-w-6xl bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 mt-4 p-4 text-red-400 hover:border-orange-500/40 transition-all duration-300 mb-4">
-      <div class="flex items-center gap-3">
-        <p class="text-sm font-medium">This giveaway has ended. You can no longer join.</p>
-      </div>
-    </div>
-
-    <div v-if="props.flash.error" class="w-full max-w-6xl bg-black/40 backdrop-blur-md rounded-xl border border-orange-500/20 mt-4 p-4 text-red-400 hover:border-orange-500/40 transition-all duration-300 mb-4">
-      <div class="flex items-center gap-3">
-        <p class="text-sm font-medium">{{ props.flash.error }}</p>
-      </div>
-    </div>
-
-   <div class="w-full max-w-6-xl mx-auto p-4 bg-slate-800 rounded-xl shadow-lg transition-all duration-300 text-white relative overflow-hidden">
-    
-    <div class="relative w-full h-52 rounded-lg mb-4 flex items-center justify-center bg-gradient-to-br from-black-90 to-black-20 border border-slate-700 overflow-hidden">
-  
-      <img :src="giveaway.image" 
-        :alt="giveaway.skin_name"
-        class="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-300">
-    </div>
-
-
-
-    <div class="flex items-center justify-between mb-4">
-      <div>
-        <h3 class="text-lg font-bold">{{ giveaway.skin_name }}</h3>
-        <p class="text-sm text-slate-300">{{ giveaway.rarity }} • ${{ giveaway.value }}</p>
-      </div>
-
-      <div class="flex flex-col items-center text-right">
-        <div class="text-xs text-slate-400">Entries</div>
-        <div class="text-2xl font-semibold flex items-center space-x-2">
-          <span class="leading-none" aria-live="polite">{{ displayCount }}</span>
-          <svg
-            v-if="isIncreasing"
-            class="w-5 h-5 text-emerald-400 animate-bounce"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fill-rule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clip-rule="evenodd" />
-          </svg>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="mb-4">
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-sm text-slate-300">
-          <span v-if="timeRemaining === 'Waiting'">Waiting for min entries...</span>
-          <span v-else-if="timeRemaining === 'Ended'">Ended</span>
-          <span v-else>Ends in: {{ timeRemaining }}</span>
-        </div>
-        <div class="text-xs text-slate-400">{{ formattedStart }}</div>
-      </div>
-
-      <div class="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
-        <div
-          class="h-full rounded-full transform origin-left transition-all duration-1000 ease-out"
-          :class="progressColor"
-          :style="{ width: `${progress}%` }"
-        ></div>
-      </div>
-    </div>
-    
-    <Button
-      v-if="page.props.auth.user?.is_admin"
-      variant="destructive"
-      @click="simulateWinner(giveaway.id)"
-    >
-      🎯 Simulate Winner
-    </Button>
-
-    <Button @click="joinGiveaway(giveaway.id)" :disabled="giveaway.entered" class="flex justify-center w-full text-white py-3 mt-4 rounded-lg font-semibold transition-all duration-200" :class="giveaway.joined ? 'bg-green-600 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-900'">
-      {{ giveaway.entered ? '✅ Joined' : '🎯 Join Giveaway' }}
-    </Button>
-
-    <div>
-      <div class="text-xs uppercase text-slate-400 mt-5 mb-2">Participants</div>
-
-       <transition-group name="list" tag="div" class="part-list old space-y-2">
-        <div
-          v-for="p in participants"
-          :key="p.id + '-' + p.entered_at"
-          class="flex items-center justify-between p-2 bg-slate-900/50 rounded-md border border-slate-700"
-          :class="{ 'ring-2 ring-emerald-400': p._isNew }"
-        >
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold">
-              {{ initials(p.name) }}
-            </div>
-            <div>
-              <div class="text-sm font-medium">{{ p.name }}</div>
-              <div class="text-xs text-slate-400">Ticket</div>
-            </div>
-          </div>
-
-          <div class="text-sm text-slate-300">{{ p.ticketCount ?? '1' }}</div>
-        </div>
-      </transition-group>
-
-      <transition-group name="participant-list" tag="div" class="space-y-2">
-
-        <div v-for="p in participants"
-          :key="p.id + '-' + p.entered_at"
-          class="flex items-center justify-between p-2 bg-slate-900/50 rounded-md border border-slate-700 transform transition-all duration-500"
-          :class="{'scale ring-2 ring-emerald-400': p._isNew}"
-        >
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold">
-              {{ initials(p.name) }}
-            </div>
-            <div>
-              <div class="text-sm font-medium">{{ p.name }}</div>
-              <div class="text-xs text-slate-400">Ticket</div>
-            </div>
-          </div>
-          <div class="text-sm text-slate-300">{{ p.ticketCount ?? '1' }}</div>
-        </div>
-      </transition-group>
-
-      <div v-if="participants.length === 0" class="text-sm text-slate-400 italic py-4 text-center">
-        No participants yet
-      </div>
-    </div>
-
-     <div v-if="winner" class="winner-old absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-emerald-400 font-bold text-2xl rounded-xl animate-fade-in">
-      🎉 Winner: {{ winner.name }} 🎉
-    </div> 
-
-    <div v-if="winner" class="mt-4 p-3 bg-emerald-500/20 rounded-lg text-center animate-winner-fade-in">
-      🎉 Winner: <span class="font-bold">{{ winner.name }}</span> 🎉
-    </div>
-
-   </div>
-
-  </div> -->
-
-  </NewAppLayout>
-
+ </NewAppLayout>
 </template>
 
 <style scoped>
